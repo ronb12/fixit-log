@@ -13,7 +13,7 @@
     <main class="shell">
       <section class="hero">
         <div>
-          <p class="eyebrow">Production Wave 1</p>
+          <p class="eyebrow">Frontend Differentiation Pass</p>
           <h1>FixIt Log</h1>
           <p class="lede">
             Run scheduled maintenance for homes and vehicles from one operations board:
@@ -21,7 +21,7 @@
           </p>
         </div>
         <div class="hero-actions">
-          <button class="primary" data-panel-target="assets">Add Asset</button>
+          <button class="primary" data-panel-target="overview">Open Logbook</button>
           <button class="secondary" data-panel-target="records">Log Maintenance</button>
         </div>
       </section>
@@ -30,12 +30,40 @@
 
       <section class="workspace">
         <aside class="rail">
-          <button class="rail-tab active" data-panel="assets">Assets</button>
+          <button class="rail-tab active" data-panel="overview">Overview</button>
+          <button class="rail-tab" data-panel="assets">Assets</button>
           <button class="rail-tab" data-panel="records">Maintenance</button>
         </aside>
 
         <div class="content">
-          <section class="panel active" data-panel-view="assets">
+          <section class="panel active" data-panel-view="overview">
+            <div class="panel-header">
+              <h2>Maintenance Logbook</h2>
+              <p>See the riskiest assets, the next due items, and your maintenance spend without dropping into forms first.</p>
+            </div>
+            <div class="overview-layout">
+              <article class="logbook-card">
+                <span class="section-kicker">Priority Asset</span>
+                <div id="priorityAsset"></div>
+              </article>
+              <article class="logbook-card">
+                <span class="section-kicker">Upcoming Work</span>
+                <div id="upcomingRecords" class="log-list"></div>
+              </article>
+            </div>
+            <div class="overview-layout secondary">
+              <article class="logbook-card">
+                <span class="section-kicker">By Category</span>
+                <div id="categorySummary" class="mini-list"></div>
+              </article>
+              <article class="logbook-card">
+                <span class="section-kicker">Vendor Spend</span>
+                <div id="vendorSummary" class="mini-list"></div>
+              </article>
+            </div>
+          </section>
+
+          <section class="panel" data-panel-view="assets">
             <div class="panel-header">
               <h2>Asset Register</h2>
               <p>Track every home system and vehicle with risk level and ownership context.</p>

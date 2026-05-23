@@ -5,6 +5,10 @@ const state = {
 
 const elements = {
   stats: document.querySelector("#stats"),
+  priorityAsset: document.querySelector("#priorityAsset"),
+  upcomingRecords: document.querySelector("#upcomingRecords"),
+  categorySummary: document.querySelector("#categorySummary"),
+  vendorSummary: document.querySelector("#vendorSummary"),
   assetList: document.querySelector("#assetList"),
   recordList: document.querySelector("#recordList"),
   assetForm: document.querySelector("#assetForm"),
@@ -106,9 +110,42 @@ function renderRecords() {
   });
 }
 
+function renderOverview() {
+  const priorityOrder = { Critical: 3, High: 2, Routine: 1 };
+  const priorityAsset = state.data.assets.slice().sort((a, b) => (priorityOrder[b.priority] || 0) - (priorityOrder[a.priority] || 0))[0];
+  elements.priorityAsset.innerHTML = priorityAsset
+    ? `<h3>${priorityAsset.name}</h3><p>${priorityAsset.category} • purchased ${priorityAsset.purchase_year || "unknown"}</p><div class="focus-line"><span class="${badgeClass(priorityAsset.priority)}">${priorityAsset.priority}</span><strong>${state.data.records.filter((record) => record.asset_id === priorityAsset.id).length} records tracked</strong></div>`
+    : `<div class="empty-state">No assets tracked yet.</div>`;
+
+  elements.upcomingRecords.innerHTML = state.data.records.length
+    ? state.data.records.slice().sort((a, b) => String(a.due_date || "").localeCompare(String(b.due_date || ""))).map((record) => {
+        const asset = state.data.assets.find((entry) => entry.id === record.asset_id);
+        return `<article class="timeline-row"><div><h4>${record.task}</h4><p>${asset ? asset.name : "Unknown asset"} • ${record.vendor || "No vendor"}</p></div><div class="timeline-meta"><span class="${badgeClass(record.status)}">${record.status}</span><strong>${record.due_date || "No due date"}</strong></div></article>`;
+      }).join("")
+    : `<div class="empty-state">No maintenance records yet.</div>`;
+
+  const categoryCounts = Object.entries(state.data.assets.reduce((acc, asset) => {
+    acc[asset.category] = (acc[asset.category] || 0) + 1;
+    return acc;
+  }, {}));
+  elements.categorySummary.innerHTML = categoryCounts.length
+    ? categoryCounts.map(([category, count]) => `<div class="mini-row"><span>${category}</span><strong>${count}</strong></div>`).join("")
+    : `<div class="empty-state">No categories tracked yet.</div>`;
+
+  const vendorSpend = Object.entries(state.data.records.reduce((acc, record) => {
+    const key = record.vendor || "Unassigned vendor";
+    acc[key] = (acc[key] || 0) + Number(record.cost || 0);
+    return acc;
+  }, {})).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  elements.vendorSummary.innerHTML = vendorSpend.length
+    ? vendorSpend.map(([vendor, total]) => `<div class="mini-row"><span>${vendor}</span><strong>${money(total)}</strong></div>`).join("")
+    : `<div class="empty-state">No vendor spend tracked yet.</div>`;
+}
+
 function render() {
   renderStats();
   renderSelects();
+  renderOverview();
   renderAssets();
   renderRecords();
 }
