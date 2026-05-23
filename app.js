@@ -1,88 +1,154 @@
-(() => {
-  const key = "fixit-log-v1";
-  const state = JSON.parse(localStorage.getItem(key) || "null") || {
-    items: [
-      { id: crypto.randomUUID(), asset: "Honda Accord", task: "Oil Change", due: "2026-06-12", cost: 84.2, status: "Logged" },
-      { id: crypto.randomUUID(), asset: "Home HVAC", task: "Filter Replacement", due: "2026-06-04", cost: 18, status: "Due Soon" },
-    ],
-  };
-  const save = () => localStorage.setItem(key, JSON.stringify(state));
+const state = {
+  activePanel: "assets",
+  data: null
+};
 
-  document.head.insertAdjacentHTML("beforeend", `<style>
-    body{margin:0;background:#12100d;color:#f6f1e8;font:16px/1.45 system-ui,sans-serif}main{max-width:1100px;margin:0 auto;padding:28px 20px 48px}
-    .fx-grid,.fx-list{display:grid;gap:16px}.fx-panels{display:grid;gap:16px;grid-template-columns:1.15fr .85fr}.fx-card{background:#221d16;border:1px solid #4d3c2a;border-radius:20px;padding:18px}
-    form{display:grid;gap:10px}.row{display:grid;gap:10px;grid-template-columns:repeat(2,minmax(0,1fr))}input,select,button{font:inherit;padding:11px 12px;border-radius:12px;border:1px solid #6d573d}
-    input,select{background:#16110b;color:#fff4e8}button{background:#e8b160;color:#1f160b;font-weight:700;cursor:pointer}.item{display:grid;gap:4px;background:#18130e;border-radius:14px;padding:14px}
-    .meta{color:#d3c2aa}.stats{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}.stat{background:#18130e;padding:14px;border-radius:14px}.good{color:#92f5b1}
-    @media (max-width:760px){.fx-panels,.row{grid-template-columns:1fr}}
-  </style>`);
+const elements = {
+  stats: document.querySelector("#stats"),
+  assetList: document.querySelector("#assetList"),
+  recordList: document.querySelector("#recordList"),
+  assetForm: document.querySelector("#assetForm"),
+  recordForm: document.querySelector("#recordForm"),
+  recordAssetId: document.querySelector("#recordAssetId"),
+  railTabs: [...document.querySelectorAll(".rail-tab")],
+  panels: [...document.querySelectorAll(".panel")],
+  heroTabs: [...document.querySelectorAll("[data-panel-target]")],
+  toast: document.querySelector("#toast"),
+  cardTemplate: document.querySelector("#cardTemplate")
+};
 
-  const main = document.querySelector("main");
+function showToast(message, isError = false) {
+  elements.toast.textContent = message;
+  elements.toast.classList.add("show");
+  elements.toast.style.borderColor = isError ? "rgba(255, 125, 125, 0.3)" : "rgba(241,188,112,.22)";
+  clearTimeout(showToast.timer);
+  showToast.timer = setTimeout(() => elements.toast.classList.remove("show"), 2200);
+}
 
-  function render() {
-    const total = state.items.reduce((sum, item) => sum + Number(item.cost), 0);
-    const dueSoon = state.items.filter((item) => item.status !== "Done").length;
-    main.innerHTML = `
-      <div class="fx-grid">
-        <section class="fx-card">
-          <h1>FixIt Log</h1>
-          <p class="meta">Track repairs, reminders, and cost history for your car and home with saved local records.</p>
-          <div class="stats">
-            <div class="stat"><strong>${state.items.length}</strong><div class="meta">Repair records</div></div>
-            <div class="stat"><strong>$${total.toFixed(2)}</strong><div class="meta">Logged spend</div></div>
-            <div class="stat"><strong>${dueSoon}</strong><div class="meta">Open reminders</div></div>
-          </div>
-        </section>
-        <section class="fx-panels">
-          <article class="fx-card">
-            <h2>Add Record</h2>
-            <form id="repairForm">
-              <div class="row">
-                <input name="asset" placeholder="Asset: House, Toyota Camry" required>
-                <input name="task" placeholder="Task" required>
-              </div>
-              <div class="row">
-                <input name="due" type="date" required>
-                <input name="cost" type="number" min="0" step="0.01" placeholder="Cost">
-              </div>
-              <select name="status"><option>Logged</option><option>Due Soon</option><option>Watching</option></select>
-              <button type="submit">Save Record</button>
-            </form>
-          </article>
-          <article class="fx-card">
-            <h2>Repair History</h2>
-            <div class="fx-list">
-              ${state.items.map((item) => `<div class="item"><b>${item.task}</b><span>${item.asset}</span><span class="meta">${item.due} • $${Number(item.cost).toFixed(2)}</span><div class="row"><span class="${item.status === "Done" ? "good" : "meta"}">${item.status}</span><button data-done="${item.id}">${item.status === "Done" ? "Reopen" : "Mark Done"}</button></div></div>`).join("")}
-            </div>
-          </article>
-        </section>
-      </div>`;
+async function request(path, options = {}) {
+  const response = await fetch(path, {
+    headers: { "Content-Type": "application/json" },
+    ...options
+  });
+  const payload = await response.json();
+  if (!response.ok) throw new Error(payload.error || "Request failed");
+  return payload;
+}
 
-    document.querySelector("#repairForm").addEventListener("submit", (event) => {
-      event.preventDefault();
-      const form = new FormData(event.currentTarget);
-      state.items.unshift({
-        id: crypto.randomUUID(),
-        asset: String(form.get("asset")),
-        task: String(form.get("task")),
-        due: String(form.get("due")),
-        cost: Number(form.get("cost") || 0),
-        status: String(form.get("status")),
-      });
-      save();
-      render();
-    });
+function money(value) {
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(Number(value || 0));
+}
 
-    document.querySelectorAll("[data-done]").forEach((button) => {
-      button.addEventListener("click", () => {
-        const item = state.items.find((entry) => entry.id === button.dataset.done);
-        item.status = item.status === "Done" ? "Logged" : "Done";
-        save();
-        render();
-      });
-    });
-  }
+function badgeClass(value) {
+  if (["Done", "Routine", "Logged"].includes(value)) return "badge";
+  if (["High", "Due Soon"].includes(value)) return "badge warn";
+  if (["Critical"].includes(value)) return "badge good";
+  return "badge";
+}
 
-  save();
+function setPanel(panel) {
+  state.activePanel = panel;
+  elements.railTabs.forEach((tab) => tab.classList.toggle("active", tab.dataset.panel === panel));
+  elements.panels.forEach((panelNode) => panelNode.classList.toggle("active", panelNode.dataset.panelView === panel));
+}
+
+function buildCard(title, badge, rows, footer = "") {
+  const card = elements.cardTemplate.content.firstElementChild.cloneNode(true);
+  card.innerHTML = `
+    <header>
+      <h3>${title}</h3>
+      <span class="${badgeClass(badge)}">${badge}</span>
+    </header>
+    <div class="record-grid">
+      ${rows.map((row) => `<div class="record-row"><span>${row.label}</span><strong>${row.value}</strong></div>`).join("")}
+    </div>
+    ${footer ? `<div class="record-row"><span>Notes</span><strong>${footer}</strong></div>` : ""}
+  `;
+  return card;
+}
+
+function renderStats() {
+  const { stats } = state.data;
+  elements.stats.innerHTML = [
+    { label: "Assets", value: stats.totalAssets },
+    { label: "Open Items", value: stats.dueSoon },
+    { label: "Urgent", value: stats.urgent },
+    { label: "Tracked Spend", value: money(stats.totalCost) }
+  ].map((item) => `<article class="stat-card"><div class="value">${item.value}</div><div class="label">${item.label}</div></article>`).join("");
+}
+
+function renderSelects() {
+  elements.recordAssetId.innerHTML = state.data.assets
+    .map((asset) => `<option value="${asset.id}">${asset.name}</option>`)
+    .join("");
+}
+
+function renderAssets() {
+  elements.assetList.innerHTML = "";
+  state.data.assets.forEach((asset) => {
+    elements.assetList.appendChild(buildCard(asset.name, asset.priority, [
+      { label: "Category", value: asset.category },
+      { label: "Purchase Year", value: asset.purchase_year || "Unknown" }
+    ]));
+  });
+}
+
+function renderRecords() {
+  elements.recordList.innerHTML = "";
+  state.data.records.forEach((record) => {
+    const asset = state.data.assets.find((entry) => entry.id === record.asset_id);
+    elements.recordList.appendChild(buildCard(record.task, record.status, [
+      { label: "Asset", value: asset ? asset.name : "Unknown" },
+      { label: "Due", value: record.due_date || "No due date" },
+      { label: "Cost", value: money(record.cost) },
+      { label: "Vendor", value: record.vendor || "Not set" }
+    ], record.notes));
+  });
+}
+
+function render() {
+  renderStats();
+  renderSelects();
+  renderAssets();
+  renderRecords();
+}
+
+async function refresh() {
+  state.data = await request("/api/bootstrap");
   render();
-})();
+}
+
+async function handleSubmit(form, endpoint, successMessage) {
+  const payload = Object.fromEntries(new FormData(form).entries());
+  state.data = await request(endpoint, {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+  render();
+  form.reset();
+  renderSelects();
+  showToast(successMessage);
+}
+
+elements.railTabs.forEach((tab) => tab.addEventListener("click", () => setPanel(tab.dataset.panel)));
+elements.heroTabs.forEach((tab) => tab.addEventListener("click", () => setPanel(tab.dataset.panelTarget)));
+
+elements.assetForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  try {
+    await handleSubmit(elements.assetForm, "/api/assets", "Asset saved.");
+  } catch (error) {
+    showToast(error.message, true);
+  }
+});
+
+elements.recordForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  try {
+    await handleSubmit(elements.recordForm, "/api/records", "Maintenance record saved.");
+  } catch (error) {
+    showToast(error.message, true);
+  }
+});
+
+refresh().catch((error) => showToast(error.message, true));
